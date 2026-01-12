@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model TextModel {
+  id            String   @id @default(uuid())
+  modelId       String   @unique @map("model_id")
+  name          String
+  provider      String
+  description   String?
+  promptPrice   Float    @map("prompt_price")
+  completionPrice Float  @map("completion_price")
+  contextLength Int      @map("context_length")
+  tags          String[] @default([])
+  popularity    Int      @default(0)
+
+  mmlu          Float?
+  gpqa          Float?
+  humanEval     Float?   @map("human_eval")
+  sweBench      Float?   @map("swe_bench")
+  liveCodeBench Float?   @map("live_code_bench")
+  math          Float?
+  speed         Int?
+  latency       Int?
+  arenaElo      Int?     @map("arena_elo")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("text_models")
+}
+
+model ImageModel {
+  id                  String   @id @default(uuid())
+  modelId             String   @unique @map("model_id")
+  name                String
+  provider            String
+  description         String?
+  pricePerImage       Float    @map("price_per_image")
+  pricePerSecond      Float?   @map("price_per_second")
+  supportedSizes      String[] @default([]) @map("supported_sizes")
+  styles              String[] @default([])
+  qualityScore        Int?     @map("quality_score")
+  speedScore          Int?     @map("speed_score")
+  maxResolution       String?  @map("max_resolution")
+  supportsInpainting  Boolean  @default(false) @map("supports_inpainting")
+  supportsOutpainting Boolean  @default(false) @map("supports_outpainting")
+  supportsControlNet  Boolean  @default(false) @map("supports_controlnet")
+  runCount            Int?     @map("run_count")
+  tags                String[] @default([])
+  popularity          Int      @default(0)
+
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("image_models")
+}
+
+model VideoModel {
+  id                   String   @id @default(uuid())
+  modelId              String   @unique @map("model_id")
+  name                 String
+  provider             String
+  description          String?
+  pricePerSecond       Float    @map("price_per_second")
+  maxDuration          Int      @map("max_duration")
+  resolution           String[] @default([])
+  qualityScore         Int?     @map("quality_score")
+  motionScore          Int?     @map("motion_score")
+  fps                  Int?
+  supportsAudio        Boolean  @default(false) @map("supports_audio")
+  supportsTextToVideo  Boolean  @default(false) @map("supports_text_to_video")
+  supportsImageToVideo Boolean  @default(false) @map("supports_image_to_video")
+  runCount             Int?     @map("run_count")
+  tags                 String[] @default([])
+  popularity           Int      @default(0)
+
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("video_models")
+}
+
+model AudioModel {
+  id              String   @id @default(uuid())
+  modelId         String   @unique @map("model_id")
+  name            String
+  provider        String
+  description     String?
+  type            String
+  pricePerMinute  Float?   @map("price_per_minute")
+  pricePerChar    Float?   @map("price_per_char")
+  languages       String[] @default([])
+  qualityScore    Int?     @map("quality_score")
+  naturalness     Int?
+  accuracy        Int?
+  voiceCloning    Boolean  @default(false) @map("voice_cloning")
+  emotionControl  Boolean  @default(false) @map("emotion_control")
+  realtime        Boolean  @default(false)
+  runCount        Int?     @map("run_count")
+  tags            String[] @default([])
+  popularity      Int      @default(0)
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("audio_models")
+}
+
+model SyncLog {
+  id              String   @id @default(uuid())
+  syncType        String   @map("sync_type")
+  status          String
+  textModelCount  Int?     @map("text_model_count")
+  imageModelCount Int?     @map("image_model_count")
+  videoModelCount Int?     @map("video_model_count")
+  audioModelCount Int?     @map("audio_model_count")
+  errorMessage    String?  @map("error_message")
+  duration        Int?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("sync_logs")
+}

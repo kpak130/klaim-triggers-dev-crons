@@ -1,0 +1,39 @@
+{
+  "name": "klaim-trigger-dev-crons",
+  "version": "1.0.0",
+  "description": "AI model pricing data sync with Trigger.dev",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "npx trigger dev",
+    "deploy": "npx trigger deploy",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kpak130/klaim-triggers-dev-crons.git"
+  },
+  "keywords": [
+    "trigger.dev",
+    "ai",
+    "pricing",
+    "cron"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
+    "@trigger.dev/sdk": "^4.3.2",
+    "pg": "^8.16.3",
+    "prisma": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.16.0",
+    "typescript": "^5.9.3"
+  }
+}
