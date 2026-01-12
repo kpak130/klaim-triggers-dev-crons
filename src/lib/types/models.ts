@@ -1,75 +1,90 @@
+export type ModelType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO';
+
 export interface BaseModel {
   id: string;
   name: string;
   provider: string;
   description: string;
-  category: 'text' | 'image' | 'video' | 'audio';
+  type: ModelType;
   tags: string[];
   popularity: number;
-  updatedAt: string;
+  runCount?: number;
 }
 
-export interface TextModel extends BaseModel {
-  category: 'text';
-  pricing: {
-    prompt: number;
-    completion: number;
-  };
+export interface TextModelFields {
   contextLength: number;
-  capabilities: string[];
+  mmlu?: number;
+  gpqa?: number;
+  humanEval?: number;
+  sweBench?: number;
+  liveCodeBench?: number;
+  math?: number;
+  arenaElo?: number;
+  speed?: number;
+  latency?: number;
 }
 
-export interface ImageModel extends BaseModel {
-  category: 'image';
-  pricing: {
-    perImage: number;
-    perSecond?: number;
-  };
+export interface ImageModelFields {
   supportedSizes: string[];
-  style: string[];
-  qualityScore?: number;
-  speedScore?: number;
+  styles: string[];
   maxResolution?: string;
   supportsInpainting?: boolean;
   supportsOutpainting?: boolean;
   supportsControlNet?: boolean;
-  runCount?: number;
+  qualityScore?: number;
+  speedScore?: number;
 }
 
-export interface VideoModel extends BaseModel {
-  category: 'video';
-  pricing: {
-    perSecond: number;
-  };
+export interface VideoModelFields {
   maxDuration: number;
   resolution: string[];
-  qualityScore?: number;
-  motionScore?: number;
   fps?: number;
   supportsAudio?: boolean;
   supportsTextToVideo?: boolean;
   supportsImageToVideo?: boolean;
-  runCount?: number;
+  qualityScore?: number;
+  motionScore?: number;
 }
 
-export interface AudioModel extends BaseModel {
-  category: 'audio';
-  pricing: {
-    perMinute?: number;
-    perCharacter?: number;
-  };
-  type: 'tts' | 'stt' | 'music';
+export interface AudioModelFields {
+  audioType: 'tts' | 'stt' | 'music';
   languages: string[];
+  voiceCloning?: boolean;
+  emotionControl?: boolean;
+  realtime?: boolean;
   qualityScore?: number;
   naturalness?: number;
   accuracy?: number;
-  voiceCloning?: boolean;
-  realtime?: boolean;
-  emotionControl?: boolean;
-  runCount?: number;
 }
 
-export type AIModel = TextModel | ImageModel | VideoModel | AudioModel;
+export interface TextModelPricing {
+  promptPrice: number;
+  completionPrice: number;
+}
+
+export interface ImageModelPricing {
+  pricePerImage: number;
+  pricePerSecond?: number;
+}
+
+export interface VideoModelPricing {
+  pricePerSecond: number;
+}
+
+export interface AudioModelPricing {
+  pricePerMinute?: number;
+  pricePerChar?: number;
+}
+
+export type ModelPricing =
+  | TextModelPricing
+  | ImageModelPricing
+  | VideoModelPricing
+  | AudioModelPricing;
+
+export interface ModelWithPrice extends BaseModel {
+  price: ModelPricing;
+}
 
 export interface BenchmarkData {
   mmlu?: number;

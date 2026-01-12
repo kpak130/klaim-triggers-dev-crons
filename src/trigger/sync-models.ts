@@ -7,7 +7,74 @@ import {
   fetchReplicateAudioModels,
 } from "../lib/api/replicate.js";
 import { getBenchmark } from "../lib/data/benchmarks.js";
-import type { TextModel, ImageModel, VideoModel, AudioModel } from "../lib/types/models.js";
+
+interface TextModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  pricing: { prompt: number; completion: number };
+  contextLength: number;
+  tags: string[];
+  popularity: number;
+}
+
+interface ImageModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  pricing: { perImage: number; perSecond?: number };
+  supportedSizes: string[];
+  style: string[];
+  qualityScore?: number;
+  speedScore?: number;
+  maxResolution?: string;
+  supportsInpainting?: boolean;
+  supportsOutpainting?: boolean;
+  supportsControlNet?: boolean;
+  runCount?: number;
+  tags: string[];
+  popularity: number;
+}
+
+interface VideoModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  pricing: { perSecond: number };
+  maxDuration: number;
+  resolution: string[];
+  qualityScore?: number;
+  motionScore?: number;
+  fps?: number;
+  supportsAudio?: boolean;
+  supportsTextToVideo?: boolean;
+  supportsImageToVideo?: boolean;
+  runCount?: number;
+  tags: string[];
+  popularity: number;
+}
+
+interface AudioModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  type: string;
+  pricing: { perMinute?: number; perCharacter?: number };
+  languages: string[];
+  qualityScore?: number;
+  naturalness?: number;
+  accuracy?: number;
+  voiceCloning?: boolean;
+  emotionControl?: boolean;
+  realtime?: boolean;
+  runCount?: number;
+  tags: string[];
+  popularity: number;
+}
 
 export const syncAIModels = schedules.task({
   id: "sync-ai-models",
@@ -53,15 +120,14 @@ export const syncAIModels = schedules.task({
       console.log("Saving audio models...");
       await saveAudioModels(audioModels);
 
+      const totalCount = textModels.length + imageModels.length + videoModels.length + audioModels.length;
       const duration = Date.now() - startTime;
+
       await prisma.syncLog.create({
         data: {
           syncType: "full",
           status: "success",
-          textModelCount: textModels.length,
-          imageModelCount: imageModels.length,
-          videoModelCount: videoModels.length,
-          audioModelCount: audioModels.length,
+          modelCount: totalCount,
           duration,
         },
       });
@@ -75,6 +141,7 @@ export const syncAIModels = schedules.task({
           image: imageModels.length,
           video: videoModels.length,
           audio: audioModels.length,
+          total: totalCount,
         },
         duration,
       };
@@ -101,14 +168,12 @@ async function saveTextModels(models: TextModel[]) {
   for (const model of models) {
     const benchmark = getBenchmark(model.id);
 
-    await prisma.textModel.upsert({
+    const savedModel = await prisma.model.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
         provider: model.provider,
         description: model.description,
-        promptPrice: model.pricing.prompt,
-        completionPrice: model.pricing.completion,
         contextLength: model.contextLength,
         tags: model.tags,
         popularity: model.popularity,
@@ -124,11 +189,10 @@ async function saveTextModels(models: TextModel[]) {
       },
       create: {
         modelId: model.id,
+        type: "TEXT",
         name: model.name,
         provider: model.provider,
         description: model.description,
-        promptPrice: model.pricing.prompt,
-        completionPrice: model.pricing.completion,
         contextLength: model.contextLength,
         tags: model.tags,
         popularity: model.popularity,
@@ -141,6 +205,19 @@ async function saveTextModels(models: TextModel[]) {
         speed: benchmark?.speed,
         latency: benchmark?.latency,
         arenaElo: benchmark?.arenaElo,
+      },
+    });
+
+    await prisma.price.upsert({
+      where: { modelId: savedModel.id },
+      update: {
+        promptPrice: model.pricing.prompt,
+        completionPrice: model.pricing.completion,
+      },
+      create: {
+        modelId: savedModel.id,
+        promptPrice: model.pricing.prompt,
+        completionPrice: model.pricing.completion,
       },
     });
   }
@@ -148,44 +225,54 @@ async function saveTextModels(models: TextModel[]) {
 
 async function saveImageModels(models: ImageModel[]) {
   for (const model of models) {
-    await prisma.imageModel.upsert({
+    const savedModel = await prisma.model.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
         provider: model.provider,
         description: model.description,
-        pricePerImage: model.pricing.perImage,
-        pricePerSecond: model.pricing.perSecond,
         supportedSizes: model.supportedSizes,
         styles: model.style,
         qualityScore: model.qualityScore,
         speedScore: model.speedScore,
         maxResolution: model.maxResolution,
-        supportsInpainting: model.supportsInpainting ?? false,
-        supportsOutpainting: model.supportsOutpainting ?? false,
-        supportsControlNet: model.supportsControlNet ?? false,
+        supportsInpainting: model.supportsInpainting,
+        supportsOutpainting: model.supportsOutpainting,
+        supportsControlNet: model.supportsControlNet,
         runCount: model.runCount,
         tags: model.tags,
         popularity: model.popularity,
       },
       create: {
         modelId: model.id,
+        type: "IMAGE",
         name: model.name,
         provider: model.provider,
         description: model.description,
-        pricePerImage: model.pricing.perImage,
-        pricePerSecond: model.pricing.perSecond,
         supportedSizes: model.supportedSizes,
         styles: model.style,
         qualityScore: model.qualityScore,
         speedScore: model.speedScore,
         maxResolution: model.maxResolution,
-        supportsInpainting: model.supportsInpainting ?? false,
-        supportsOutpainting: model.supportsOutpainting ?? false,
-        supportsControlNet: model.supportsControlNet ?? false,
+        supportsInpainting: model.supportsInpainting,
+        supportsOutpainting: model.supportsOutpainting,
+        supportsControlNet: model.supportsControlNet,
         runCount: model.runCount,
         tags: model.tags,
         popularity: model.popularity,
+      },
+    });
+
+    await prisma.price.upsert({
+      where: { modelId: savedModel.id },
+      update: {
+        pricePerImage: model.pricing.perImage,
+        pricePerSecond: model.pricing.perSecond,
+      },
+      create: {
+        modelId: savedModel.id,
+        pricePerImage: model.pricing.perImage,
+        pricePerSecond: model.pricing.perSecond,
       },
     });
   }
@@ -193,42 +280,52 @@ async function saveImageModels(models: ImageModel[]) {
 
 async function saveVideoModels(models: VideoModel[]) {
   for (const model of models) {
-    await prisma.videoModel.upsert({
+    const savedModel = await prisma.model.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
         provider: model.provider,
         description: model.description,
-        pricePerSecond: model.pricing.perSecond,
         maxDuration: model.maxDuration,
         resolution: model.resolution,
         qualityScore: model.qualityScore,
         motionScore: model.motionScore,
         fps: model.fps,
-        supportsAudio: model.supportsAudio ?? false,
-        supportsTextToVideo: model.supportsTextToVideo ?? false,
-        supportsImageToVideo: model.supportsImageToVideo ?? false,
+        supportsAudio: model.supportsAudio,
+        supportsTextToVideo: model.supportsTextToVideo,
+        supportsImageToVideo: model.supportsImageToVideo,
         runCount: model.runCount,
         tags: model.tags,
         popularity: model.popularity,
       },
       create: {
         modelId: model.id,
+        type: "VIDEO",
         name: model.name,
         provider: model.provider,
         description: model.description,
-        pricePerSecond: model.pricing.perSecond,
         maxDuration: model.maxDuration,
         resolution: model.resolution,
         qualityScore: model.qualityScore,
         motionScore: model.motionScore,
         fps: model.fps,
-        supportsAudio: model.supportsAudio ?? false,
-        supportsTextToVideo: model.supportsTextToVideo ?? false,
-        supportsImageToVideo: model.supportsImageToVideo ?? false,
+        supportsAudio: model.supportsAudio,
+        supportsTextToVideo: model.supportsTextToVideo,
+        supportsImageToVideo: model.supportsImageToVideo,
         runCount: model.runCount,
         tags: model.tags,
         popularity: model.popularity,
+      },
+    });
+
+    await prisma.price.upsert({
+      where: { modelId: savedModel.id },
+      update: {
+        pricePerSecond: model.pricing.perSecond,
+      },
+      create: {
+        modelId: savedModel.id,
+        pricePerSecond: model.pricing.perSecond,
       },
     });
   }
@@ -236,44 +333,54 @@ async function saveVideoModels(models: VideoModel[]) {
 
 async function saveAudioModels(models: AudioModel[]) {
   for (const model of models) {
-    await prisma.audioModel.upsert({
+    const savedModel = await prisma.model.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
         provider: model.provider,
         description: model.description,
-        type: model.type,
-        pricePerMinute: model.pricing.perMinute,
-        pricePerChar: model.pricing.perCharacter,
+        audioType: model.type,
         languages: model.languages,
         qualityScore: model.qualityScore,
         naturalness: model.naturalness,
         accuracy: model.accuracy,
-        voiceCloning: model.voiceCloning ?? false,
-        emotionControl: model.emotionControl ?? false,
-        realtime: model.realtime ?? false,
+        voiceCloning: model.voiceCloning,
+        emotionControl: model.emotionControl,
+        realtime: model.realtime,
         runCount: model.runCount,
         tags: model.tags,
         popularity: model.popularity,
       },
       create: {
         modelId: model.id,
+        type: "AUDIO",
         name: model.name,
         provider: model.provider,
         description: model.description,
-        type: model.type,
-        pricePerMinute: model.pricing.perMinute,
-        pricePerChar: model.pricing.perCharacter,
+        audioType: model.type,
         languages: model.languages,
         qualityScore: model.qualityScore,
         naturalness: model.naturalness,
         accuracy: model.accuracy,
-        voiceCloning: model.voiceCloning ?? false,
-        emotionControl: model.emotionControl ?? false,
-        realtime: model.realtime ?? false,
+        voiceCloning: model.voiceCloning,
+        emotionControl: model.emotionControl,
+        realtime: model.realtime,
         runCount: model.runCount,
         tags: model.tags,
         popularity: model.popularity,
+      },
+    });
+
+    await prisma.price.upsert({
+      where: { modelId: savedModel.id },
+      update: {
+        pricePerMinute: model.pricing.perMinute,
+        pricePerChar: model.pricing.perCharacter,
+      },
+      create: {
+        modelId: savedModel.id,
+        pricePerMinute: model.pricing.perMinute,
+        pricePerChar: model.pricing.perCharacter,
       },
     });
   }
