@@ -14,8 +14,8 @@ enum ModelType {
   AUDIO
 }
 
-model Model {
-  id          String    @id @default(uuid())
+model AiModel {
+  id          Int       @id @default(autoincrement())
   modelId     String    @unique @map("model_id")
   type        ModelType
   name        String
@@ -75,15 +75,15 @@ model Model {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  price Price?
+  price AiPrice?
 
-  @@map("models")
+  @@map("ai_models")
 }
 
-model Price {
-  id      String @id @default(uuid())
-  modelId String @unique @map("model_id")
-  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+model AiPrice {
+  id      Int    @id @default(autoincrement())
+  modelId Int    @unique @map("model_id")
+  model   AiModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   // Text model pricing (per token)
   promptPrice     Float? @map("prompt_price")
@@ -102,11 +102,11 @@ model Price {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("prices")
+  @@map("ai_prices")
 }
 
 model SyncLog {
-  id           String  @id @default(uuid())
+  id           Int     @id @default(autoincrement())
   syncType     String  @map("sync_type")
   status       String
   modelCount   Int?    @map("model_count")

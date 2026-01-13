@@ -178,7 +178,7 @@ async function saveTextModels(models: TextModel[]) {
   for (const model of models) {
     const benchmark = getBenchmark(model.id);
 
-    const savedModel = await prisma.model.upsert({
+    const savedModel = await prisma.aiModel.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
@@ -218,7 +218,7 @@ async function saveTextModels(models: TextModel[]) {
       },
     });
 
-    await prisma.price.upsert({
+    await prisma.aiPrice.upsert({
       where: { modelId: savedModel.id },
       update: {
         promptPrice: model.pricing.prompt,
@@ -235,7 +235,7 @@ async function saveTextModels(models: TextModel[]) {
 
 async function saveImageModels(models: ImageModel[]) {
   for (const model of models) {
-    const savedModel = await prisma.model.upsert({
+    const savedModel = await prisma.aiModel.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
@@ -273,7 +273,7 @@ async function saveImageModels(models: ImageModel[]) {
       },
     });
 
-    await prisma.price.upsert({
+    await prisma.aiPrice.upsert({
       where: { modelId: savedModel.id },
       update: {
         pricePerImage: model.pricing.perImage,
@@ -290,7 +290,7 @@ async function saveImageModels(models: ImageModel[]) {
 
 async function saveVideoModels(models: VideoModel[]) {
   for (const model of models) {
-    const savedModel = await prisma.model.upsert({
+    const savedModel = await prisma.aiModel.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
@@ -328,7 +328,7 @@ async function saveVideoModels(models: VideoModel[]) {
       },
     });
 
-    await prisma.price.upsert({
+    await prisma.aiPrice.upsert({
       where: { modelId: savedModel.id },
       update: {
         pricePerSecond: model.pricing.perSecond,
@@ -343,7 +343,7 @@ async function saveVideoModels(models: VideoModel[]) {
 
 async function saveAudioModels(models: AudioModel[]) {
   for (const model of models) {
-    const savedModel = await prisma.model.upsert({
+    const savedModel = await prisma.aiModel.upsert({
       where: { modelId: model.id },
       update: {
         name: model.name,
@@ -381,7 +381,7 @@ async function saveAudioModels(models: AudioModel[]) {
       },
     });
 
-    await prisma.price.upsert({
+    await prisma.aiPrice.upsert({
       where: { modelId: savedModel.id },
       update: {
         pricePerMinute: model.pricing.perMinute,
@@ -398,7 +398,7 @@ async function saveAudioModels(models: AudioModel[]) {
 
 async function softDeleteRemovedModels(apiModelIds: string[]) {
   // Find models in DB that are not in API (and not already deleted)
-  const dbModels = await prisma.model.findMany({
+  const dbModels = await prisma.aiModel.findMany({
     where: { deletedAt: null },
     select: { id: true, modelId: true },
   });
@@ -409,7 +409,7 @@ async function softDeleteRemovedModels(apiModelIds: string[]) {
   if (modelsToDelete.length > 0) {
     console.log(`Soft deleting ${modelsToDelete.length} models no longer in API`);
 
-    await prisma.model.updateMany({
+    await prisma.aiModel.updateMany({
       where: {
         id: { in: modelsToDelete.map(m => m.id) },
       },
@@ -420,7 +420,7 @@ async function softDeleteRemovedModels(apiModelIds: string[]) {
   }
 
   // Restore models that reappeared in API
-  const deletedModels = await prisma.model.findMany({
+  const deletedModels = await prisma.aiModel.findMany({
     where: { deletedAt: { not: null } },
     select: { id: true, modelId: true },
   });
@@ -430,7 +430,7 @@ async function softDeleteRemovedModels(apiModelIds: string[]) {
   if (modelsToRestore.length > 0) {
     console.log(`Restoring ${modelsToRestore.length} models that reappeared in API`);
 
-    await prisma.model.updateMany({
+    await prisma.aiModel.updateMany({
       where: {
         id: { in: modelsToRestore.map(m => m.id) },
       },
