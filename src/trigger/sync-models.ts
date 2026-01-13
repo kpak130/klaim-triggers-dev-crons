@@ -120,6 +120,16 @@ export const syncAIModels = schedules.task({
       console.log("Saving audio models...");
       await saveAudioModels(audioModels);
 
+      // Soft delete models that are no longer in API
+      console.log("Checking for deleted models...");
+      const allApiModelIds = [
+        ...textModels.map(m => m.id),
+        ...imageModels.map(m => m.id),
+        ...videoModels.map(m => m.id),
+        ...audioModels.map(m => m.id),
+      ];
+      await softDeleteRemovedModels(allApiModelIds);
+
       const totalCount = textModels.length + imageModels.length + videoModels.length + audioModels.length;
       const duration = Date.now() - startTime;
 
@@ -381,6 +391,51 @@ async function saveAudioModels(models: AudioModel[]) {
         modelId: savedModel.id,
         pricePerMinute: model.pricing.perMinute,
         pricePerChar: model.pricing.perCharacter,
+      },
+    });
+  }
+}
+
+async function softDeleteRemovedModels(apiModelIds: string[]) {
+  // Find models in DB that are not in API (and not already deleted)
+  const dbModels = await prisma.model.findMany({
+    where: { deletedAt: null },
+    select: { id: true, modelId: true },
+  });
+
+  const apiModelIdSet = new Set(apiModelIds);
+  const modelsToDelete = dbModels.filter(m => !apiModelIdSet.has(m.modelId));
+
+  if (modelsToDelete.length > 0) {
+    console.log(`Soft deleting ${modelsToDelete.length} models no longer in API`);
+
+    await prisma.model.updateMany({
+      where: {
+        id: { in: modelsToDelete.map(m => m.id) },
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+  }
+
+  // Restore models that reappeared in API
+  const deletedModels = await prisma.model.findMany({
+    where: { deletedAt: { not: null } },
+    select: { id: true, modelId: true },
+  });
+
+  const modelsToRestore = deletedModels.filter(m => apiModelIdSet.has(m.modelId));
+
+  if (modelsToRestore.length > 0) {
+    console.log(`Restoring ${modelsToRestore.length} models that reappeared in API`);
+
+    await prisma.model.updateMany({
+      where: {
+        id: { in: modelsToRestore.map(m => m.id) },
+      },
+      data: {
+        deletedAt: null,
       },
     });
   }
