@@ -97,3 +97,91 @@ export interface BenchmarkData {
   latency?: number;
   arenaElo?: number;
 }
+
+export interface TextModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  category: 'text';
+  pricing: {
+    prompt: number;
+    completion: number;
+  };
+  contextLength: number;
+  tags: string[];
+  popularity: number;
+  updatedAt: string;
+  capabilities: string[];
+}
+
+export interface ImageModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  category: 'image';
+  pricing: {
+    perImage: number;
+    perSecond?: number;
+  };
+  supportedSizes: string[];
+  style: string[];
+  qualityScore?: number;
+  speedScore?: number;
+  maxResolution?: string;
+  supportsInpainting?: boolean;
+  supportsOutpainting?: boolean;
+  supportsControlNet?: boolean;
+  runCount?: number;
+  tags: string[];
+  popularity: number;
+  updatedAt: string;
+}
+
+export interface VideoModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  category: 'video';
+  pricing: {
+    perSecond: number;
+  };
+  maxDuration: number;
+  resolution: string[];
+  qualityScore?: number;
+  motionScore?: number;
+  fps?: number;
+  supportsAudio?: boolean;
+  supportsTextToVideo?: boolean;
+  supportsImageToVideo?: boolean;
+  runCount?: number;
+  tags: string[];
+  popularity: number;
+  updatedAt: string;
+}
+
+export interface AudioModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  category: 'audio';
+  type: string;
+  pricing: {
+    perMinute?: number;
+    perCharacter?: number;
+  };
+  languages: string[];
+  qualityScore?: number;
+  naturalness?: number;
+  accuracy?: number;
+  voiceCloning?: boolean;
+  emotionControl?: boolean;
+  realtime?: boolean;
+  runCount?: number;
+  tags: string[];
+  popularity: number;
+  updatedAt: string;
+}
