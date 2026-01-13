@@ -19,7 +19,6 @@ model AiModel {
   modelId     String    @unique @map("model_id")
   type        ModelType
   name        String
-  provider    String
   description String?
 
   // Common fields
@@ -85,9 +84,9 @@ model AiPrice {
   modelId Int    @unique @map("model_id")
   model   AiModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
-  // Text model pricing (per token)
-  promptPrice     Float? @map("prompt_price")
-  completionPrice Float? @map("completion_price")
+  // Text model pricing (per 1M tokens)
+  inputPrice  Float? @map("input_price")
+  outputPrice Float? @map("output_price")
 
   // Image model pricing
   pricePerImage Float? @map("price_per_image")

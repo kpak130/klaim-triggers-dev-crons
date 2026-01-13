@@ -182,7 +182,6 @@ async function saveTextModels(models: TextModel[]) {
       where: { modelId: model.id },
       update: {
         name: model.name,
-        provider: model.provider,
         description: model.description,
         contextLength: model.contextLength,
         tags: model.tags,
@@ -201,7 +200,6 @@ async function saveTextModels(models: TextModel[]) {
         modelId: model.id,
         type: "TEXT",
         name: model.name,
-        provider: model.provider,
         description: model.description,
         contextLength: model.contextLength,
         tags: model.tags,
@@ -221,13 +219,13 @@ async function saveTextModels(models: TextModel[]) {
     await prisma.aiPrice.upsert({
       where: { modelId: savedModel.id },
       update: {
-        promptPrice: model.pricing.prompt,
-        completionPrice: model.pricing.completion,
+        inputPrice: model.pricing.prompt,
+        outputPrice: model.pricing.completion,
       },
       create: {
         modelId: savedModel.id,
-        promptPrice: model.pricing.prompt,
-        completionPrice: model.pricing.completion,
+        inputPrice: model.pricing.prompt,
+        outputPrice: model.pricing.completion,
       },
     });
   }
@@ -239,7 +237,6 @@ async function saveImageModels(models: ImageModel[]) {
       where: { modelId: model.id },
       update: {
         name: model.name,
-        provider: model.provider,
         description: model.description,
         supportedSizes: model.supportedSizes,
         styles: model.style,
@@ -257,7 +254,6 @@ async function saveImageModels(models: ImageModel[]) {
         modelId: model.id,
         type: "IMAGE",
         name: model.name,
-        provider: model.provider,
         description: model.description,
         supportedSizes: model.supportedSizes,
         styles: model.style,
@@ -294,7 +290,6 @@ async function saveVideoModels(models: VideoModel[]) {
       where: { modelId: model.id },
       update: {
         name: model.name,
-        provider: model.provider,
         description: model.description,
         maxDuration: model.maxDuration,
         resolution: model.resolution,
@@ -312,7 +307,6 @@ async function saveVideoModels(models: VideoModel[]) {
         modelId: model.id,
         type: "VIDEO",
         name: model.name,
-        provider: model.provider,
         description: model.description,
         maxDuration: model.maxDuration,
         resolution: model.resolution,
@@ -347,7 +341,6 @@ async function saveAudioModels(models: AudioModel[]) {
       where: { modelId: model.id },
       update: {
         name: model.name,
-        provider: model.provider,
         description: model.description,
         audioType: model.type,
         languages: model.languages,
@@ -365,7 +358,6 @@ async function saveAudioModels(models: AudioModel[]) {
         modelId: model.id,
         type: "AUDIO",
         name: model.name,
-        provider: model.provider,
         description: model.description,
         audioType: model.type,
         languages: model.languages,

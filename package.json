@@ -34,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/pg": "^8.16.0",
+    "trigger.dev": "^4.3.2",
     "typescript": "^5.9.3"
   }
 }
