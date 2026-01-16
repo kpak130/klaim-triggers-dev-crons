@@ -101,7 +101,7 @@ model AiPrice {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("ai_prices")
+  @@map("ai_model_prices")
 }
 
 model SyncLog {

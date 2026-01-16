@@ -107,6 +107,55 @@ function getAudioMeta(modelKey: string): AudioModelMeta | null {
   return AUDIO_MODEL_META[modelKey] || null;
 }
 
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  'stability-ai': 'Stability AI',
+  'black-forest-labs': 'Black Forest Labs',
+  'bytedance': 'ByteDance',
+  'lucataco': 'Lucataco',
+  'playgroundai': 'Playground AI',
+  'minimax': 'MiniMax',
+  'luma': 'Luma',
+  'tencent': 'Tencent',
+  'genmo': 'Genmo',
+  'openai': 'OpenAI',
+  'suno-ai': 'Suno AI',
+  'cjwbw': 'CJWBW',
+  'adirik': 'Adirik',
+  'meta': 'Meta',
+  'google': 'Google',
+  'ideogram': 'Ideogram',
+  'recraft-ai': 'Recraft AI',
+  'fofr': 'Fofr',
+  'zsxkib': 'Zsxkib',
+  'mcai': 'MCAI',
+  'chenxwh': 'Chenxwh',
+  'nvidia': 'NVIDIA',
+  'facebookresearch': 'Facebook Research',
+  'cerspense': 'Cerspense',
+  'cuuupid': 'Cuuupid',
+  'daanelson': 'Daanelson',
+  'lightricks': 'Lightricks',
+  'alibaba': 'Alibaba',
+  'rhymes-ai': 'Rhymes AI',
+};
+
+function formatSlugToTitle(slug: string): string {
+  return slug
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function formatProviderName(owner: string): string {
+  return PROVIDER_DISPLAY_NAMES[owner] || formatSlugToTitle(owner);
+}
+
+function formatModelDisplayName(owner: string, modelName: string): string {
+  const providerDisplay = formatProviderName(owner);
+  const modelDisplay = formatSlugToTitle(modelName);
+  return `${providerDisplay}: ${modelDisplay}`;
+}
+
 function estimateImagePrice(model: ReplicateModel): number {
   const modelKey = `${model.owner}/${model.name}`;
   const meta = IMAGE_MODEL_META[modelKey];
@@ -155,8 +204,8 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
 
       return {
         id: modelKey,
-        name: model.name,
-        provider: model.owner,
+        name: formatModelDisplayName(model.owner, model.name),
+        provider: formatProviderName(model.owner),
         description: model.description || '',
         category: 'image' as const,
         pricing: {
@@ -213,8 +262,8 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
 
       return {
         id: modelKey,
-        name: model.name,
-        provider: model.owner,
+        name: formatModelDisplayName(model.owner, model.name),
+        provider: formatProviderName(model.owner),
         description: model.description || '',
         category: 'video' as const,
         pricing: {
@@ -269,8 +318,8 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         const meta = getAudioMeta(id);
         audioModels.push({
           id,
-          name: model.name,
-          provider: model.owner,
+          name: formatModelDisplayName(model.owner, model.name),
+          provider: formatProviderName(model.owner),
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
@@ -298,8 +347,8 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         const meta = getAudioMeta(id);
         audioModels.push({
           id,
-          name: model.name,
-          provider: model.owner,
+          name: formatModelDisplayName(model.owner, model.name),
+          provider: formatProviderName(model.owner),
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
