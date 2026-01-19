@@ -1,17 +1,5 @@
 import type { ImageModel, VideoModel, AudioModel } from '../types/models.js';
 
-interface BillingTier {
-  price: number;
-  unit: string;
-  criteria?: Record<string, unknown>;
-}
-
-interface BillingConfig {
-  billing_type?: string;
-  metric?: string;
-  current_tiers?: BillingTier[];
-}
-
 interface ReplicateModel {
   url: string;
   owner: string;
@@ -37,10 +25,6 @@ interface ReplicateModel {
       };
     };
   };
-}
-
-interface ReplicateModelDetail extends ReplicateModel {
-  billing_config?: BillingConfig;
 }
 
 interface ReplicateCollectionResponse {
@@ -77,6 +61,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   'lightricks': 'Lightricks',
   'alibaba': 'Alibaba',
   'rhymes-ai': 'Rhymes AI',
+  'kwaivgi': 'Kuaishou',
 };
 
 function formatSlugToTitle(slug: string): string {
@@ -96,29 +81,41 @@ function formatModelDisplayName(owner: string, modelName: string): string {
   return `${providerDisplay}: ${modelDisplay}`;
 }
 
-async function fetchModelDetail(apiToken: string, owner: string, name: string): Promise<ReplicateModelDetail | null> {
+async function fetchPriceFromWebPage(owner: string, name: string): Promise<number | undefined> {
   try {
-    const response = await fetch(`https://api.replicate.com/v1/models/${owner}/${name}`, {
+    const response = await fetch(`https://replicate.com/${owner}/${name}`, {
       headers: {
-        'Authorization': `Token ${apiToken}`,
-        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
       },
     });
-    if (!response.ok) return null;
-    return (await response.json()) as ReplicateModelDetail;
+
+    if (!response.ok) return undefined;
+
+    const html = await response.text();
+
+    const pricePatterns = [
+      /\$([0-9]+\.?[0-9]*)\s*per\s*second/i,
+      /\$([0-9]+\.?[0-9]*)\s*per\s*image/i,
+      /\$([0-9]+\.?[0-9]*)\s*\/\s*second/i,
+      /\$([0-9]+\.?[0-9]*)\s*\/\s*image/i,
+      /"price":\s*([0-9]+\.?[0-9]*)/,
+      /price.*?\$([0-9]+\.?[0-9]*)/i,
+    ];
+
+    for (const pattern of pricePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        const price = parseFloat(match[1]);
+        if (price > 0 && price < 100) {
+          return price;
+        }
+      }
+    }
+
+    return undefined;
   } catch {
-    return null;
+    return undefined;
   }
-}
-
-function extractPriceFromBillingConfig(billingConfig: BillingConfig | undefined): number | undefined {
-  if (!billingConfig?.current_tiers || billingConfig.current_tiers.length === 0) return undefined;
-
-  const tier = billingConfig.current_tiers[0];
-  if (tier.price && tier.price > 0) {
-    return tier.price;
-  }
-  return undefined;
 }
 
 export async function fetchReplicateImageModels(apiToken: string): Promise<ImageModel[]> {
@@ -149,8 +146,7 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
     for (const model of uniqueModels) {
       const modelKey = `${model.owner}/${model.name}`;
 
-      const detail = await fetchModelDetail(apiToken, model.owner, model.name);
-      const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+      const price = await fetchPriceFromWebPage(model.owner, model.name);
 
       imageModels.push({
         id: modelKey,
@@ -159,7 +155,7 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
         description: model.description || '',
         category: 'image' as const,
         pricing: {
-          perImage: apiPrice,
+          perImage: price,
         },
         supportedSizes: ['1024x1024', '512x512'],
         style: ['photorealistic', 'artistic'],
@@ -205,8 +201,7 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
     for (const model of uniqueModels) {
       const modelKey = `${model.owner}/${model.name}`;
 
-      const detail = await fetchModelDetail(apiToken, model.owner, model.name);
-      const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+      const price = await fetchPriceFromWebPage(model.owner, model.name);
 
       videoModels.push({
         id: modelKey,
@@ -215,7 +210,7 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
         description: model.description || '',
         category: 'video' as const,
         pricing: {
-          perSecond: apiPrice,
+          perSecond: price,
         },
         maxDuration: 10,
         resolution: ['720p', '1080p'],
@@ -260,8 +255,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         if (seen.has(id)) continue;
         seen.add(id);
 
-        const detail = await fetchModelDetail(apiToken, model.owner, model.name);
-        const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+        const price = await fetchPriceFromWebPage(model.owner, model.name);
 
         audioModels.push({
           id,
@@ -270,7 +264,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perMinute: apiPrice,
+            perMinute: price,
           },
           type: 'stt',
           languages: ['en', 'ko', 'ja', 'zh', 'es', 'fr', 'de'],
@@ -289,8 +283,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         if (seen.has(id)) continue;
         seen.add(id);
 
-        const detail = await fetchModelDetail(apiToken, model.owner, model.name);
-        const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+        const price = await fetchPriceFromWebPage(model.owner, model.name);
 
         audioModels.push({
           id,
@@ -299,7 +292,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perCharacter: apiPrice,
+            perCharacter: price,
           },
           type: 'tts',
           languages: ['en'],
