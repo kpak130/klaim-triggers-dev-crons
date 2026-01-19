@@ -1,5 +1,17 @@
 import type { ImageModel, VideoModel, AudioModel } from '../types/models.js';
 
+interface BillingTier {
+  price: number;
+  unit: string;
+  criteria?: Record<string, unknown>;
+}
+
+interface BillingConfig {
+  billing_type?: string;
+  metric?: string;
+  current_tiers?: BillingTier[];
+}
+
 interface ReplicateModel {
   url: string;
   owner: string;
@@ -25,6 +37,10 @@ interface ReplicateModel {
       };
     };
   };
+}
+
+interface ReplicateModelDetail extends ReplicateModel {
+  billing_config?: BillingConfig;
 }
 
 interface ReplicateCollectionResponse {
@@ -174,6 +190,31 @@ function estimateVideoPrice(model: ReplicateModel): number {
   return model.run_count > 100000 ? 0.04 : 0.025;
 }
 
+async function fetchModelDetail(apiToken: string, owner: string, name: string): Promise<ReplicateModelDetail | null> {
+  try {
+    const response = await fetch(`https://api.replicate.com/v1/models/${owner}/${name}`, {
+      headers: {
+        'Authorization': `Token ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as ReplicateModelDetail;
+  } catch {
+    return null;
+  }
+}
+
+function extractPriceFromBillingConfig(billingConfig: BillingConfig | undefined): number | null {
+  if (!billingConfig?.current_tiers || billingConfig.current_tiers.length === 0) return null;
+
+  const tier = billingConfig.current_tiers[0];
+  if (tier.price && tier.price > 0) {
+    return tier.price;
+  }
+  return null;
+}
+
 export async function fetchReplicateImageModels(apiToken: string): Promise<ImageModel[]> {
   try {
     const response = await fetch('https://api.replicate.com/v1/collections/text-to-image', {
@@ -197,12 +238,17 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
       return true;
     });
 
-    return uniqueModels.map((model): ImageModel => {
+    const imageModels: ImageModel[] = [];
+
+    for (const model of uniqueModels) {
       const modelKey = `${model.owner}/${model.name}`;
       const meta = getImageMeta(modelKey);
-      const price = estimateImagePrice(model);
 
-      return {
+      const detail = await fetchModelDetail(apiToken, model.owner, model.name);
+      const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+      const price = apiPrice ?? estimateImagePrice(model);
+
+      imageModels.push({
         id: modelKey,
         name: formatModelDisplayName(model.owner, model.name),
         provider: formatProviderName(model.owner),
@@ -224,8 +270,10 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
         supportsOutpainting: meta?.supportsOutpainting,
         supportsControlNet: meta?.supportsControlNet,
         runCount: model.run_count,
-      };
-    });
+      });
+    }
+
+    return imageModels;
   } catch (error) {
     console.error('Failed to fetch Replicate image models:', error);
     return [];
@@ -255,12 +303,17 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
       return true;
     });
 
-    return uniqueModels.map((model): VideoModel => {
+    const videoModels: VideoModel[] = [];
+
+    for (const model of uniqueModels) {
       const modelKey = `${model.owner}/${model.name}`;
       const meta = getVideoMeta(modelKey);
-      const price = estimateVideoPrice(model);
 
-      return {
+      const detail = await fetchModelDetail(apiToken, model.owner, model.name);
+      const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+      const price = apiPrice ?? estimateVideoPrice(model);
+
+      videoModels.push({
         id: modelKey,
         name: formatModelDisplayName(model.owner, model.name),
         provider: formatProviderName(model.owner),
@@ -281,8 +334,10 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
         supportsTextToVideo: meta?.supportsTextToVideo,
         supportsImageToVideo: meta?.supportsImageToVideo,
         runCount: model.run_count,
-      };
-    });
+      });
+    }
+
+    return videoModels;
   } catch (error) {
     console.error('Failed to fetch Replicate video models:', error);
     return [];
@@ -311,11 +366,15 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
 
     if (sttResponse.ok) {
       const sttData = (await sttResponse.json()) as ReplicateCollectionResponse;
-      sttData.models.forEach((model) => {
+      for (const model of sttData.models) {
         const id = `${model.owner}/${model.name}`;
-        if (seen.has(id)) return;
+        if (seen.has(id)) continue;
         seen.add(id);
         const meta = getAudioMeta(id);
+
+        const detail = await fetchModelDetail(apiToken, model.owner, model.name);
+        const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+
         audioModels.push({
           id,
           name: formatModelDisplayName(model.owner, model.name),
@@ -323,7 +382,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perMinute: meta?.perMinute || 0.006,
+            perMinute: apiPrice ?? meta?.perMinute ?? 0.006,
           },
           type: 'stt',
           languages: ['en', 'ko', 'ja', 'zh', 'es', 'fr', 'de'],
@@ -335,16 +394,20 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           realtime: meta?.realtime,
           runCount: model.run_count,
         });
-      });
+      }
     }
 
     if (ttsResponse.ok) {
       const ttsData = (await ttsResponse.json()) as ReplicateCollectionResponse;
-      ttsData.models.forEach((model) => {
+      for (const model of ttsData.models) {
         const id = `${model.owner}/${model.name}`;
-        if (seen.has(id)) return;
+        if (seen.has(id)) continue;
         seen.add(id);
         const meta = getAudioMeta(id);
+
+        const detail = await fetchModelDetail(apiToken, model.owner, model.name);
+        const apiPrice = extractPriceFromBillingConfig(detail?.billing_config);
+
         audioModels.push({
           id,
           name: formatModelDisplayName(model.owner, model.name),
@@ -352,7 +415,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perCharacter: meta?.perCharacter || 0.015,
+            perCharacter: apiPrice ?? meta?.perCharacter ?? 0.015,
           },
           type: 'tts',
           languages: ['en'],
@@ -365,7 +428,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           emotionControl: meta?.emotionControl,
           runCount: model.run_count,
         });
-      });
+      }
     }
 
     return audioModels;
