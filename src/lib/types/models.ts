@@ -122,7 +122,7 @@ export interface ImageModel {
   description: string;
   category: 'image';
   pricing: {
-    perImage: number;
+    perImage?: number;
     perSecond?: number;
   };
   supportedSizes: string[];
@@ -146,7 +146,7 @@ export interface VideoModel {
   description: string;
   category: 'video';
   pricing: {
-    perSecond: number;
+    perSecond?: number;
   };
   maxDuration: number;
   resolution: string[];
