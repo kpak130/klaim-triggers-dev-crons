@@ -94,12 +94,12 @@ async function fetchPriceFromWebPage(owner: string, name: string): Promise<numbe
     const html = await response.text();
 
     const pricePatterns = [
+      /"price":\s*"\$([0-9]+\.?[0-9]*)"/,
       /\$([0-9]+\.?[0-9]*)\s*per\s*second/i,
       /\$([0-9]+\.?[0-9]*)\s*per\s*image/i,
       /\$([0-9]+\.?[0-9]*)\s*\/\s*second/i,
       /\$([0-9]+\.?[0-9]*)\s*\/\s*image/i,
       /"price":\s*([0-9]+\.?[0-9]*)/,
-      /price.*?\$([0-9]+\.?[0-9]*)/i,
     ];
 
     for (const pattern of pricePatterns) {
