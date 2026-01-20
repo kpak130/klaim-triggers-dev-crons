@@ -172,6 +172,7 @@ export interface AudioModel {
   pricing: {
     perMinute?: number;
     perCharacter?: number;
+    perSecond?: number;
   };
   languages: string[];
   qualityScore?: number;

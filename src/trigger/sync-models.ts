@@ -24,7 +24,7 @@ interface ImageModel {
   name: string;
   provider: string;
   description: string;
-  pricing: { perImage: number; perSecond?: number };
+  pricing: { perImage?: number; perSecond?: number };
   supportedSizes: string[];
   style: string[];
   qualityScore?: number;
@@ -43,7 +43,7 @@ interface VideoModel {
   name: string;
   provider: string;
   description: string;
-  pricing: { perSecond: number };
+  pricing: { perSecond?: number };
   maxDuration: number;
   resolution: string[];
   qualityScore?: number;
@@ -63,7 +63,7 @@ interface AudioModel {
   provider: string;
   description: string;
   type: string;
-  pricing: { perMinute?: number; perCharacter?: number };
+  pricing: { perMinute?: number; perCharacter?: number; perSecond?: number };
   languages: string[];
   qualityScore?: number;
   naturalness?: number;
@@ -378,11 +378,13 @@ async function saveAudioModels(models: AudioModel[]) {
       update: {
         pricePerMinute: model.pricing.perMinute,
         pricePerChar: model.pricing.perCharacter,
+        pricePerSecond: model.pricing.perSecond,
       },
       create: {
         modelId: savedModel.id,
         pricePerMinute: model.pricing.perMinute,
         pricePerChar: model.pricing.perCharacter,
+        pricePerSecond: model.pricing.perSecond,
       },
     });
   }

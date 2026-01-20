@@ -81,7 +81,7 @@ function formatModelDisplayName(owner: string, modelName: string): string {
   return `${providerDisplay}: ${modelDisplay}`;
 }
 
-async function fetchPriceFromWebPage(owner: string, name: string): Promise<number | undefined> {
+async function fetchPriceFromWebPage(owner: string, name: string, type: 'image' | 'video' | 'audio' = 'image'): Promise<number | undefined> {
   try {
     const response = await fetch(`https://replicate.com/${owner}/${name}`, {
       headers: {
@@ -93,22 +93,47 @@ async function fetchPriceFromWebPage(owner: string, name: string): Promise<numbe
 
     const html = await response.text();
 
-    const pricePatterns = [
-      /"price":\s*"\$([0-9]+\.?[0-9]*)"/,
-      /\$([0-9]+\.?[0-9]*)\s*per\s*second/i,
-      /\$([0-9]+\.?[0-9]*)\s*per\s*image/i,
-      /\$([0-9]+\.?[0-9]*)\s*\/\s*second/i,
-      /\$([0-9]+\.?[0-9]*)\s*\/\s*image/i,
-      /"price":\s*([0-9]+\.?[0-9]*)/,
-    ];
+    if (type === 'video') {
+      const perSecondJsonMatch = html.match(/"price":\s*"\$([0-9]+\.?[0-9]*)",\s*"title":\s*"per second/i);
+      if (perSecondJsonMatch && perSecondJsonMatch[1]) {
+        const price = parseFloat(perSecondJsonMatch[1]);
+        if (price > 0.01 && price < 100) {
+          return price;
+        }
+      }
+    }
 
-    for (const pattern of pricePatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        const price = parseFloat(match[1]);
+    if (type === 'audio') {
+      const perSecondInlineMatch = html.match(/"price":\s*"\$([0-9]+\.?[0-9]*)\s*per\s*second"/i);
+      if (perSecondInlineMatch && perSecondInlineMatch[1]) {
+        const price = parseFloat(perSecondInlineMatch[1]);
         if (price > 0 && price < 100) {
           return price;
         }
+      }
+    }
+
+    const perOutputJsonMatch = html.match(/"price":\s*"\$([0-9]+\.?[0-9]*)",\s*"title":\s*"per output/i);
+    if (perOutputJsonMatch && perOutputJsonMatch[1]) {
+      const price = parseFloat(perOutputJsonMatch[1]);
+      if (price > 0.001 && price < 100) {
+        return price;
+      }
+    }
+
+    const outputPriceMatch = html.match(/\$([0-9]+\.?[0-9]*)\s*per\s*output/i);
+    if (outputPriceMatch && outputPriceMatch[1]) {
+      const price = parseFloat(outputPriceMatch[1]);
+      if (price > 0.001 && price < 100) {
+        return price;
+      }
+    }
+
+    const p50Match = html.match(/"p50price":\s*"\$([0-9]+\.?[0-9]*)"/);
+    if (p50Match && p50Match[1]) {
+      const price = parseFloat(p50Match[1]);
+      if (price > 0.001 && price < 100) {
+        return price;
       }
     }
 
@@ -145,7 +170,6 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
 
     for (const model of uniqueModels) {
       const modelKey = `${model.owner}/${model.name}`;
-
       const price = await fetchPriceFromWebPage(model.owner, model.name);
 
       imageModels.push({
@@ -200,8 +224,7 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
 
     for (const model of uniqueModels) {
       const modelKey = `${model.owner}/${model.name}`;
-
-      const price = await fetchPriceFromWebPage(model.owner, model.name);
+      const price = await fetchPriceFromWebPage(model.owner, model.name, 'video');
 
       videoModels.push({
         id: modelKey,
@@ -255,7 +278,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         if (seen.has(id)) continue;
         seen.add(id);
 
-        const price = await fetchPriceFromWebPage(model.owner, model.name);
+        const price = await fetchPriceFromWebPage(model.owner, model.name, 'audio');
 
         audioModels.push({
           id,
@@ -264,7 +287,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perMinute: price,
+            perSecond: price,
           },
           type: 'stt',
           languages: ['en', 'ko', 'ja', 'zh', 'es', 'fr', 'de'],
@@ -283,7 +306,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         if (seen.has(id)) continue;
         seen.add(id);
 
-        const price = await fetchPriceFromWebPage(model.owner, model.name);
+        const price = await fetchPriceFromWebPage(model.owner, model.name, 'audio');
 
         audioModels.push({
           id,
@@ -292,7 +315,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perCharacter: price,
+            perSecond: price,
           },
           type: 'tts',
           languages: ['en'],
