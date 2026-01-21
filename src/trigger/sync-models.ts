@@ -63,7 +63,7 @@ interface AudioModel {
   provider: string;
   description: string;
   type: string;
-  pricing: { perMinute?: number; perCharacter?: number; perSecond?: number };
+  pricing: { perMinute?: number; perCharacter?: number; perSecond?: number; perOutput?: number };
   languages: string[];
   qualityScore?: number;
   naturalness?: number;
@@ -325,13 +325,13 @@ async function saveVideoModels(models: VideoModel[]) {
     await prisma.aiPrice.upsert({
       where: { modelId: savedModel.id },
       update: {
-        pricePerSecond: model.pricing.perSecond,
-        pricePerVideo: model.pricing.perVideo,
+        pricePerSecond: model.pricing.perSecond ?? null,
+        pricePerVideo: model.pricing.perVideo ?? null,
       },
       create: {
         modelId: savedModel.id,
-        pricePerSecond: model.pricing.perSecond,
-        pricePerVideo: model.pricing.perVideo,
+        pricePerSecond: model.pricing.perSecond ?? null,
+        pricePerVideo: model.pricing.perVideo ?? null,
       },
     });
   }
@@ -339,6 +339,9 @@ async function saveVideoModels(models: VideoModel[]) {
 
 async function saveAudioModels(models: AudioModel[]) {
   for (const model of models) {
+    if (model.pricing.perOutput !== undefined) {
+      console.log(`[SaveAudio] ${model.id}: perOutput=${model.pricing.perOutput}, perSecond=${model.pricing.perSecond}`);
+    }
     const savedModel = await prisma.aiModel.upsert({
       where: { modelId: model.id },
       update: {
@@ -378,15 +381,17 @@ async function saveAudioModels(models: AudioModel[]) {
     await prisma.aiPrice.upsert({
       where: { modelId: savedModel.id },
       update: {
-        pricePerMinute: model.pricing.perMinute,
-        pricePerChar: model.pricing.perCharacter,
-        pricePerSecond: model.pricing.perSecond,
+        pricePerMinute: model.pricing.perMinute ?? null,
+        pricePerChar: model.pricing.perCharacter ?? null,
+        pricePerSecond: model.pricing.perSecond ?? null,
+        pricePerOutput: model.pricing.perOutput ?? null,
       },
       create: {
         modelId: savedModel.id,
-        pricePerMinute: model.pricing.perMinute,
-        pricePerChar: model.pricing.perCharacter,
-        pricePerSecond: model.pricing.perSecond,
+        pricePerMinute: model.pricing.perMinute ?? null,
+        pricePerChar: model.pricing.perCharacter ?? null,
+        pricePerSecond: model.pricing.perSecond ?? null,
+        pricePerOutput: model.pricing.perOutput ?? null,
       },
     });
   }

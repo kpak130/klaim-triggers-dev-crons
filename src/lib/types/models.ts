@@ -75,6 +75,7 @@ export interface VideoModelPricing {
 export interface AudioModelPricing {
   pricePerMinute?: number;
   pricePerChar?: number;
+  pricePerOutput?: number;
 }
 
 export type ModelPricing =
@@ -175,6 +176,7 @@ export interface AudioModel {
     perMinute?: number;
     perCharacter?: number;
     perSecond?: number;
+    perOutput?: number;
   };
   languages: string[];
   qualityScore?: number;

@@ -98,6 +98,7 @@ model AiPrice {
   // Audio model pricing
   pricePerMinute Float? @map("price_per_minute")
   pricePerChar   Float? @map("price_per_char")
+  pricePerOutput Float? @map("price_per_output")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

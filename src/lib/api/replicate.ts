@@ -87,6 +87,7 @@ interface BillingTier {
     price: string;
     metric: string;
     metric_display?: string;
+    title?: string;
   }>;
 }
 
@@ -97,6 +98,11 @@ interface BillingConfig {
 interface VideoPriceResult {
   price: number;
   type: 'perSecond' | 'perVideo';
+}
+
+interface AudioPriceResult {
+  price: number;
+  type: 'perSecond' | 'perOutput';
 }
 
 function parseBillingConfig(html: string): BillingConfig | null {
@@ -122,12 +128,17 @@ function extractPriceFromBillingConfig(
 
   const priceInfo = tier.prices[0];
   const priceStr = priceInfo.price;
+  const title = priceInfo.title || '';
 
   const priceMatch = priceStr.match(/\$([0-9]+\.?[0-9]*)/);
   if (!priceMatch) return undefined;
 
-  const price = parseFloat(priceMatch[1]);
+  let price = parseFloat(priceMatch[1]);
   if (price <= 0 || price >= 100) return undefined;
+
+  if (title.includes('thousand') || title.includes('1000') || title.includes('1,000')) {
+    price = price / 1000;
+  }
 
   const metric = priceInfo.metric || '';
   const metricDisplay = priceInfo.metric_display || '';
@@ -257,6 +268,68 @@ async function fetchVideoPriceFromWebPage(owner: string, name: string): Promise<
 
     return { price, type: 'perVideo' };
   } catch {
+    return undefined;
+  }
+}
+
+async function fetchAudioPriceFromWebPage(owner: string, name: string): Promise<AudioPriceResult | undefined> {
+  try {
+    const response = await fetch(`https://replicate.com/${owner}/${name}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`[AudioPrice] ${owner}/${name}: HTTP ${response.status}`);
+      return undefined;
+    }
+
+    const html = await response.text();
+
+    const billingConfig = parseBillingConfig(html);
+    if (!billingConfig) {
+      console.log(`[AudioPrice] ${owner}/${name}: No billingConfig (free/open-source)`);
+      return { price: 0, type: 'perSecond' };
+    }
+
+    const tiers = billingConfig.current_tiers;
+    if (!tiers || tiers.length === 0) {
+      console.log(`[AudioPrice] ${owner}/${name}: No tiers`);
+      return { price: 0, type: 'perSecond' };
+    }
+
+    const tier = tiers[0];
+    if (!tier.prices || tier.prices.length === 0) {
+      console.log(`[AudioPrice] ${owner}/${name}: No prices in tier`);
+      return { price: 0, type: 'perSecond' };
+    }
+
+    const priceInfo = tier.prices[0];
+    const priceStr = priceInfo.price;
+
+    const priceMatch = priceStr.match(/\$([0-9]+\.?[0-9]*)/);
+    if (!priceMatch) {
+      console.log(`[AudioPrice] ${owner}/${name}: No price match in "${priceStr}"`);
+      return { price: 0, type: 'perSecond' };
+    }
+
+    const price = parseFloat(priceMatch[1]);
+    if (price <= 0 || price >= 100) {
+      console.log(`[AudioPrice] ${owner}/${name}: Price out of range: ${price}`);
+      return { price: 0, type: 'perSecond' };
+    }
+
+    const metric = priceInfo.metric || '';
+    console.log(`[AudioPrice] ${owner}/${name}: price=$${price}, metric="${metric}"`);
+
+    if (metric.includes('output_count') || metric.includes('output')) {
+      return { price, type: 'perOutput' };
+    }
+
+    return { price, type: 'perSecond' };
+  } catch (err) {
+    console.log(`[AudioPrice] ${owner}/${name}: Error - ${err}`);
     return undefined;
   }
 }
@@ -397,7 +470,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         if (seen.has(id)) continue;
         seen.add(id);
 
-        const price = await fetchPriceFromWebPage(model.owner, model.name, 'audio');
+        const priceResult = await fetchAudioPriceFromWebPage(model.owner, model.name);
 
         audioModels.push({
           id,
@@ -406,7 +479,8 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perSecond: price,
+            perSecond: priceResult?.type === 'perSecond' ? priceResult.price : undefined,
+            perOutput: priceResult?.type === 'perOutput' ? priceResult.price : undefined,
           },
           type: 'stt',
           languages: ['en', 'ko', 'ja', 'zh', 'es', 'fr', 'de'],
@@ -425,7 +499,7 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
         if (seen.has(id)) continue;
         seen.add(id);
 
-        const price = await fetchPriceFromWebPage(model.owner, model.name, 'audio');
+        const priceResult = await fetchAudioPriceFromWebPage(model.owner, model.name);
 
         audioModels.push({
           id,
@@ -434,7 +508,8 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           description: model.description || '',
           category: 'audio' as const,
           pricing: {
-            perSecond: price,
+            perSecond: priceResult?.type === 'perSecond' ? priceResult.price : undefined,
+            perOutput: priceResult?.type === 'perOutput' ? priceResult.price : undefined,
           },
           type: 'tts',
           languages: ['en'],
