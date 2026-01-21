@@ -127,8 +127,8 @@ export interface ImageModel {
     perImage?: number;
     perSecond?: number;
   };
-  supportedSizes: string[];
-  style: string[];
+  supportedSizes?: string[];
+  style?: string[];
   qualityScore?: number;
   speedScore?: number;
   maxResolution?: string;
@@ -151,8 +151,8 @@ export interface VideoModel {
     perSecond?: number;
     perVideo?: number;
   };
-  maxDuration: number;
-  resolution: string[];
+  maxDuration?: number;
+  resolution?: string[];
   qualityScore?: number;
   motionScore?: number;
   fps?: number;
@@ -178,7 +178,7 @@ export interface AudioModel {
     perSecond?: number;
     perOutput?: number;
   };
-  languages: string[];
+  languages?: string[];
   qualityScore?: number;
   naturalness?: number;
   accuracy?: number;

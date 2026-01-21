@@ -97,12 +97,12 @@ interface BillingConfig {
 
 interface VideoPriceResult {
   price: number;
-  type: 'perSecond' | 'perVideo';
+  type: 'perSecond' | 'perVideo' | 'not_found';
 }
 
 interface AudioPriceResult {
   price: number;
-  type: 'perSecond' | 'perOutput';
+  type: 'perSecond' | 'perOutput' | 'perChar' | 'not_found';
 }
 
 function parseBillingConfig(html: string): BillingConfig | null {
@@ -196,7 +196,7 @@ function extractPriceFromRegex(html: string, type: 'image' | 'video' | 'audio'):
   return undefined;
 }
 
-async function fetchPriceFromWebPage(owner: string, name: string, type: 'image' | 'video' | 'audio' = 'image'): Promise<number | undefined> {
+async function fetchPriceFromWebPage(owner: string, name: string, type: 'image' | 'video' | 'audio' = 'image'): Promise<number | 'not_found' | undefined> {
   try {
     const response = await fetch(`https://replicate.com/${owner}/${name}`, {
       headers: {
@@ -204,7 +204,12 @@ async function fetchPriceFromWebPage(owner: string, name: string, type: 'image' 
       },
     });
 
-    if (!response.ok) return undefined;
+    if (!response.ok) {
+      if (response.status === 404) {
+        return 'not_found';
+      }
+      return undefined;
+    }
 
     const html = await response.text();
 
@@ -234,7 +239,12 @@ async function fetchVideoPriceFromWebPage(owner: string, name: string): Promise<
       },
     });
 
-    if (!response.ok) return undefined;
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { price: 0, type: 'not_found' };
+      }
+      return undefined;
+    }
 
     const html = await response.text();
 
@@ -257,6 +267,10 @@ async function fetchVideoPriceFromWebPage(owner: string, name: string): Promise<
     if (price <= 0 || price >= 100) return { price: 0, type: 'perVideo' };
 
     const metric = priceInfo.metric || '';
+
+    if (metric.includes('unspecified')) {
+      return { price: 0, type: 'perVideo' };
+    }
 
     if (metric.includes('duration') || metric.includes('second')) {
       return { price, type: 'perSecond' };
@@ -282,6 +296,9 @@ async function fetchAudioPriceFromWebPage(owner: string, name: string): Promise<
 
     if (!response.ok) {
       console.log(`[AudioPrice] ${owner}/${name}: HTTP ${response.status}`);
+      if (response.status === 404) {
+        return { price: 0, type: 'not_found' };
+      }
       return undefined;
     }
 
@@ -314,17 +331,31 @@ async function fetchAudioPriceFromWebPage(owner: string, name: string): Promise<
       return { price: 0, type: 'perSecond' };
     }
 
-    const price = parseFloat(priceMatch[1]);
+    let price = parseFloat(priceMatch[1]);
     if (price <= 0 || price >= 100) {
       console.log(`[AudioPrice] ${owner}/${name}: Price out of range: ${price}`);
       return { price: 0, type: 'perSecond' };
     }
 
-    const metric = priceInfo.metric || '';
-    console.log(`[AudioPrice] ${owner}/${name}: price=$${price}, metric="${metric}"`);
+    const title = priceInfo.title || '';
+    if (title.includes('thousand') || title.includes('1000') || title.includes('1,000')) {
+      console.log(`[AudioPrice] ${owner}/${name}: Dividing by 1000 (title: "${title}")`);
+      price = price / 1000;
+    }
 
-    if (metric.includes('output_count') || metric.includes('output')) {
+    const metric = priceInfo.metric || '';
+    console.log(`[AudioPrice] ${owner}/${name}: price=$${price}, metric="${metric}", title="${title}"`);
+
+    if (metric.includes('output_count')) {
       return { price, type: 'perOutput' };
+    }
+
+    if (metric.includes('token') || metric.includes('character')) {
+      return { price, type: 'perChar' };
+    }
+
+    if (metric.includes('duration') || metric.includes('second')) {
+      return { price, type: 'perSecond' };
     }
 
     return { price, type: 'perSecond' };
@@ -363,6 +394,11 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
       const modelKey = `${model.owner}/${model.name}`;
       const price = await fetchPriceFromWebPage(model.owner, model.name);
 
+      if (price === 'not_found') {
+        console.log(`[Image] Skipping ${modelKey}: model page not found (404)`);
+        continue;
+      }
+
       imageModels.push({
         id: modelKey,
         name: formatModelDisplayName(model.owner, model.name),
@@ -372,8 +408,6 @@ export async function fetchReplicateImageModels(apiToken: string): Promise<Image
         pricing: {
           perImage: price,
         },
-        supportedSizes: ['1024x1024', '512x512'],
-        style: ['photorealistic', 'artistic'],
         tags: model.run_count > 1000000 ? ['popular'] : [],
         popularity: Math.min(100, Math.floor(model.run_count / 100000)),
         updatedAt: model.latest_version?.created_at || new Date().toISOString(),
@@ -417,6 +451,11 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
       const modelKey = `${model.owner}/${model.name}`;
       const priceResult = await fetchVideoPriceFromWebPage(model.owner, model.name);
 
+      if (priceResult?.type === 'not_found') {
+        console.log(`[Video] Skipping ${modelKey}: model page not found (404)`);
+        continue;
+      }
+
       videoModels.push({
         id: modelKey,
         name: formatModelDisplayName(model.owner, model.name),
@@ -427,8 +466,6 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
           perSecond: priceResult?.type === 'perSecond' ? priceResult.price : undefined,
           perVideo: priceResult?.type === 'perVideo' ? priceResult.price : undefined,
         },
-        maxDuration: 10,
-        resolution: ['720p', '1080p'],
         tags: model.run_count > 100000 ? ['popular'] : [],
         popularity: Math.min(100, Math.floor(model.run_count / 10000)),
         updatedAt: model.latest_version?.created_at || new Date().toISOString(),
@@ -472,6 +509,11 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
 
         const priceResult = await fetchAudioPriceFromWebPage(model.owner, model.name);
 
+        if (priceResult?.type === 'not_found') {
+          console.log(`[Audio] Skipping ${id}: model page not found (404)`);
+          continue;
+        }
+
         audioModels.push({
           id,
           name: formatModelDisplayName(model.owner, model.name),
@@ -481,9 +523,9 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           pricing: {
             perSecond: priceResult?.type === 'perSecond' ? priceResult.price : undefined,
             perOutput: priceResult?.type === 'perOutput' ? priceResult.price : undefined,
+            perCharacter: priceResult?.type === 'perChar' ? priceResult.price : undefined,
           },
           type: 'stt',
-          languages: ['en', 'ko', 'ja', 'zh', 'es', 'fr', 'de'],
           tags: model.run_count > 100000 ? ['popular'] : [],
           popularity: Math.min(100, Math.floor(model.run_count / 10000)),
           updatedAt: model.latest_version?.created_at || new Date().toISOString(),
@@ -501,6 +543,11 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
 
         const priceResult = await fetchAudioPriceFromWebPage(model.owner, model.name);
 
+        if (priceResult?.type === 'not_found') {
+          console.log(`[Audio] Skipping ${id}: model page not found (404)`);
+          continue;
+        }
+
         audioModels.push({
           id,
           name: formatModelDisplayName(model.owner, model.name),
@@ -510,9 +557,9 @@ export async function fetchReplicateAudioModels(apiToken: string): Promise<Audio
           pricing: {
             perSecond: priceResult?.type === 'perSecond' ? priceResult.price : undefined,
             perOutput: priceResult?.type === 'perOutput' ? priceResult.price : undefined,
+            perCharacter: priceResult?.type === 'perChar' ? priceResult.price : undefined,
           },
           type: 'tts',
-          languages: ['en'],
           tags: model.run_count > 100000 ? ['popular'] : [],
           popularity: Math.min(100, Math.floor(model.run_count / 10000)),
           updatedAt: model.latest_version?.created_at || new Date().toISOString(),
