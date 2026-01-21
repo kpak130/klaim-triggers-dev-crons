@@ -68,7 +68,8 @@ export interface ImageModelPricing {
 }
 
 export interface VideoModelPricing {
-  pricePerSecond: number;
+  pricePerSecond?: number;
+  pricePerVideo?: number;
 }
 
 export interface AudioModelPricing {
@@ -147,6 +148,7 @@ export interface VideoModel {
   category: 'video';
   pricing: {
     perSecond?: number;
+    perVideo?: number;
   };
   maxDuration: number;
   resolution: string[];

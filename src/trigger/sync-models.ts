@@ -326,10 +326,12 @@ async function saveVideoModels(models: VideoModel[]) {
       where: { modelId: savedModel.id },
       update: {
         pricePerSecond: model.pricing.perSecond,
+        pricePerVideo: model.pricing.perVideo,
       },
       create: {
         modelId: savedModel.id,
         pricePerSecond: model.pricing.perSecond,
+        pricePerVideo: model.pricing.perVideo,
       },
     });
   }

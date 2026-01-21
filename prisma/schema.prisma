@@ -91,8 +91,9 @@ model AiPrice {
   // Image model pricing
   pricePerImage Float? @map("price_per_image")
 
-  // Video/Image model pricing (per second of generation)
+  // Video model pricing
   pricePerSecond Float? @map("price_per_second")
+  pricePerVideo  Float? @map("price_per_video")
 
   // Audio model pricing
   pricePerMinute Float? @map("price_per_minute")

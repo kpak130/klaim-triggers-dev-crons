@@ -81,6 +81,110 @@ function formatModelDisplayName(owner: string, modelName: string): string {
   return `${providerDisplay}: ${modelDisplay}`;
 }
 
+interface BillingTier {
+  criteria: Array<{ value?: string }>;
+  prices: Array<{
+    price: string;
+    metric: string;
+    metric_display?: string;
+  }>;
+}
+
+interface BillingConfig {
+  current_tiers?: BillingTier[];
+}
+
+interface VideoPriceResult {
+  price: number;
+  type: 'perSecond' | 'perVideo';
+}
+
+function parseBillingConfig(html: string): BillingConfig | null {
+  const match = html.match(/"billingConfig"\s*:\s*(\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})/);
+  if (!match) return null;
+
+  try {
+    return JSON.parse(match[1]) as BillingConfig;
+  } catch {
+    return null;
+  }
+}
+
+function extractPriceFromBillingConfig(
+  billingConfig: BillingConfig,
+  type: 'image' | 'video' | 'audio'
+): number | undefined {
+  const tiers = billingConfig.current_tiers;
+  if (!tiers || tiers.length === 0) return undefined;
+
+  const tier = tiers[0];
+  if (!tier.prices || tier.prices.length === 0) return undefined;
+
+  const priceInfo = tier.prices[0];
+  const priceStr = priceInfo.price;
+
+  const priceMatch = priceStr.match(/\$([0-9]+\.?[0-9]*)/);
+  if (!priceMatch) return undefined;
+
+  const price = parseFloat(priceMatch[1]);
+  if (price <= 0 || price >= 100) return undefined;
+
+  const metric = priceInfo.metric || '';
+  const metricDisplay = priceInfo.metric_display || '';
+
+  if (type === 'image') {
+    if (metric.includes('image') || metricDisplay.includes('image')) {
+      return price;
+    }
+    return 0;
+  } else if (type === 'video') {
+    if (metric.includes('video') || metric.includes('second') || metricDisplay.includes('second')) {
+      return price;
+    }
+  } else if (type === 'audio') {
+    if (metric.includes('audio') || metric.includes('second') || metricDisplay.includes('second')) {
+      return price;
+    }
+  }
+
+  return price;
+}
+
+function extractPriceFromRegex(html: string, type: 'image' | 'video' | 'audio'): number | undefined {
+  if (type === 'image') {
+    return 0;
+  }
+
+  const patterns: RegExp[] = [];
+
+  if (type === 'video') {
+    patterns.push(
+      /"price":\s*"\$([0-9]+\.?[0-9]*)",\s*"metric":\s*"video/,
+      /\$([0-9]+\.?[0-9]*)\s*per\s*second\s*of\s*output\s*video/i,
+      /"price":\s*"\$([0-9]+\.?[0-9]*)",\s*"title":\s*"per second/i,
+      /\$([0-9]+\.?[0-9]*)\s*per\s*second/i
+    );
+  } else if (type === 'audio') {
+    patterns.push(
+      /"price":\s*"\$([0-9]+\.?[0-9]*)",\s*"metric":\s*"audio/,
+      /"price":\s*"\$([0-9]+\.?[0-9]*)\s*per\s*second"/i,
+      /\$([0-9]+\.?[0-9]*)\s*per\s*second/i
+    );
+  }
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const price = parseFloat(match[1]);
+      if (price > 0 && price < 100) {
+        return price;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 async function fetchPriceFromWebPage(owner: string, name: string, type: 'image' | 'video' | 'audio' = 'image'): Promise<number | undefined> {
   try {
     const response = await fetch(`https://replicate.com/${owner}/${name}`, {
@@ -93,51 +197,65 @@ async function fetchPriceFromWebPage(owner: string, name: string, type: 'image' 
 
     const html = await response.text();
 
-    if (type === 'video') {
-      const perSecondJsonMatch = html.match(/"price":\s*"\$([0-9]+\.?[0-9]*)",\s*"title":\s*"per second/i);
-      if (perSecondJsonMatch && perSecondJsonMatch[1]) {
-        const price = parseFloat(perSecondJsonMatch[1]);
-        if (price > 0.01 && price < 100) {
-          return price;
-        }
+    const billingConfig = parseBillingConfig(html);
+    if (billingConfig) {
+      const price = extractPriceFromBillingConfig(billingConfig, type);
+      if (price !== undefined) {
+        return price;
       }
     }
 
     if (type === 'audio') {
-      const perSecondInlineMatch = html.match(/"price":\s*"\$([0-9]+\.?[0-9]*)\s*per\s*second"/i);
-      if (perSecondInlineMatch && perSecondInlineMatch[1]) {
-        const price = parseFloat(perSecondInlineMatch[1]);
-        if (price > 0 && price < 100) {
-          return price;
-        }
-      }
+      return 0;
     }
 
-    const perOutputJsonMatch = html.match(/"price":\s*"\$([0-9]+\.?[0-9]*)",\s*"title":\s*"per output/i);
-    if (perOutputJsonMatch && perOutputJsonMatch[1]) {
-      const price = parseFloat(perOutputJsonMatch[1]);
-      if (price > 0.001 && price < 100) {
-        return price;
-      }
-    }
-
-    const outputPriceMatch = html.match(/\$([0-9]+\.?[0-9]*)\s*per\s*output/i);
-    if (outputPriceMatch && outputPriceMatch[1]) {
-      const price = parseFloat(outputPriceMatch[1]);
-      if (price > 0.001 && price < 100) {
-        return price;
-      }
-    }
-
-    const p50Match = html.match(/"p50price":\s*"\$([0-9]+\.?[0-9]*)"/);
-    if (p50Match && p50Match[1]) {
-      const price = parseFloat(p50Match[1]);
-      if (price > 0.001 && price < 100) {
-        return price;
-      }
-    }
-
+    return extractPriceFromRegex(html, type);
+  } catch {
     return undefined;
+  }
+}
+
+async function fetchVideoPriceFromWebPage(owner: string, name: string): Promise<VideoPriceResult | undefined> {
+  try {
+    const response = await fetch(`https://replicate.com/${owner}/${name}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+    });
+
+    if (!response.ok) return undefined;
+
+    const html = await response.text();
+
+    const billingConfig = parseBillingConfig(html);
+    if (!billingConfig) return { price: 0, type: 'perVideo' };
+
+    const tiers = billingConfig.current_tiers;
+    if (!tiers || tiers.length === 0) return { price: 0, type: 'perVideo' };
+
+    const tier = tiers[0];
+    if (!tier.prices || tier.prices.length === 0) return { price: 0, type: 'perVideo' };
+
+    const priceInfo = tier.prices[0];
+    const priceStr = priceInfo.price;
+
+    const priceMatch = priceStr.match(/\$([0-9]+\.?[0-9]*)/);
+    if (!priceMatch) return { price: 0, type: 'perVideo' };
+
+    const price = parseFloat(priceMatch[1]);
+    if (price <= 0 || price >= 100) return { price: 0, type: 'perVideo' };
+
+    const metric = priceInfo.metric || '';
+
+    if (metric.includes('duration') || metric.includes('second')) {
+      return { price, type: 'perSecond' };
+    }
+
+    if (metric.includes('video') || metric.includes('count')) {
+      return { price, type: 'perVideo' };
+    }
+
+    return { price, type: 'perVideo' };
   } catch {
     return undefined;
   }
@@ -224,7 +342,7 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
 
     for (const model of uniqueModels) {
       const modelKey = `${model.owner}/${model.name}`;
-      const price = await fetchPriceFromWebPage(model.owner, model.name, 'video');
+      const priceResult = await fetchVideoPriceFromWebPage(model.owner, model.name);
 
       videoModels.push({
         id: modelKey,
@@ -233,7 +351,8 @@ export async function fetchReplicateVideoModels(apiToken: string): Promise<Video
         description: model.description || '',
         category: 'video' as const,
         pricing: {
-          perSecond: price,
+          perSecond: priceResult?.type === 'perSecond' ? priceResult.price : undefined,
+          perVideo: priceResult?.type === 'perVideo' ? priceResult.price : undefined,
         },
         maxDuration: 10,
         resolution: ['720p', '1080p'],
